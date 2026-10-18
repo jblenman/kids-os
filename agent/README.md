@@ -1,1 +1,1 @@
-# agent/ — kid-agent: pulls policies, pins, wallpaper, screen-time windows from the home git mirror and applies them. Starts in v3.
+# agent/ — planned (roadmap item 2): `kid-agent`, a pull-based agent that applies the launcher config, Chrome policies, PIN, wallpaper and screen-time windows from a git repository the parents control. Nothing here yet.
