@@ -38,6 +38,7 @@ A small, locked-down Linux for a child's computer that looks and feels like a Ch
    | `KIDS_OS_HOSTNAME` | (`kids-desktop`) |
    | `KIDS_OS_TIMEZONE` | tz database name, e.g. `Europe/Berlin` (`Etc/UTC`) |
    | `KIDS_OS_SCALE` | Chrome's device scale factor (`1.5`) |
+   | `KIDS_OS_DATA_MAX` | cap for the data partition, e.g. `32G`, for a stick whose real capacity you doubt (none — it grows to the whole medium) |
    | `KIDS_OS_HOST` | `admin@ip` of the box, used by `deploy-live.sh` only (none) |
 
    `authorized_keys` — your SSH public key(s). Without it the image accepts no ssh login at all. Optional next to them: `config.json` (the launcher's apps — start from `mkosi/mkosi.extra/etc/kids-os/config.json`) and `wallpaper.png` (1920×1080).
@@ -77,7 +78,7 @@ sudo kids-os-install /dev/sdX [--windows-disk /dev/sdY] --yes
 - Rehearse it first on your build host: `bash test-install.sh ~/kids-os-build/kids-os_<version>.raw` (see [`docs/development.md`](docs/development.md)).
 
 ## How it works
-- **Disk (the image):** GPT — ESP 1 GiB (GRUB for EFI *and* BIOS, kernel, initrds) · BIOS boot 1 MiB · root 4 GiB ext4, fixed size · `kids-data`, pre-placed behind the root and grown to the medium by `systemd-repart` on first boot, mounted at `/data`. The data partition is capped at 32 GiB in `mkosi/mkosi.extra/usr/lib/repart.d/20-data.conf` as a guard against fake-capacity sticks; raise or remove the cap for media you trust.
+- **Disk (the image):** GPT — ESP 1 GiB (GRUB for EFI *and* BIOS, kernel, initrds) · BIOS boot 1 MiB · root 4 GiB ext4, fixed size · `kids-data`, pre-placed behind the root and grown to the medium by `systemd-repart` on first boot, mounted at `/data`. Set `KIDS_OS_DATA_MAX` (e.g. `32G`) at build time to cap it on a stick whose real capacity you doubt.
 - **Boot chain:** GRUB → Linux 6.12 → systemd `graphical.target` → `kids-os-session.service` (a oneshot running `session-select`) starts **either** `greeter-session.service` — user `greeter`, labwc + Chrome `--kiosk` on `login.html`, only while `/etc/kids-os/pin.hash` exists and `/run/kids-os/unlocked` does not — **or** `kid-session.service` — user `kid`, labwc + the waybar shelf + Chrome (`cage` + Chrome as the fallback if labwc dies within 20 s). The two session units `Conflicts=` each other; `ExecStopPost=loginctl terminate-user` keeps a restart clean. The box never suspends (`AllowSuspend=no`, `IdleAction=ignore`).
 - **`kids-sessiond`** (root, Python, `127.0.0.1:7707`) serves the shell pages from `/usr/share/kids-os/shell/` and a small JSON API: `GET /api/config` · `POST /api/unlock {pin}` (pbkdf2 check with a failure delay; touches `/run/kids-os/unlocked`, starts the kid session) · `POST /api/launch {url}` (opens the URL in the kid's Chrome, closes the launcher) · `POST /api/signout` · `POST /api/power {poweroff|reboot}`.
 - **Shell:** `labwc` with server decorations off and every window maximized (`/etc/kids-os/labwc/`), `waybar` as the shelf (`/etc/kids-os/waybar/`), `swaybg` for the wallpaper; the pages `login.html` (PIN pad, shut down / restart) and `launcher.html` (search + app grid, sign out, shut down). Design notes: [`shell/DESIGN.md`](shell/DESIGN.md).

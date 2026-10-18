@@ -7,6 +7,7 @@
 #     KIDS_OS_WIFI_SSID / KIDS_OS_WIFI_PSK   Wi-Fi to join (optional; without it use Ethernet or `nmtui` on tty2)
 #     KIDS_OS_PIN                  4–8 digit sign-in PIN for the kid session (optional; none = no sign-in screen)
 #     KIDS_OS_HOSTNAME (default kids-desktop) · KIDS_OS_TIMEZONE (default Etc/UTC) · KIDS_OS_SCALE (default 1.5)
+#     KIDS_OS_DATA_MAX             cap for the data partition, e.g. 32G — only for media whose real capacity is in doubt (default: none)
 #   files staged into /etc/kids-os/local/ (removed again below)
 #     authorized_keys   the admin's ssh public keys · config.json  the launcher's apps · wallpaper.png
 set -euo pipefail
@@ -70,6 +71,9 @@ TZ_NAME="${KIDS_OS_TIMEZONE:-Etc/UTC}"
 [ -f "$BUILDROOT/usr/share/zoneinfo/$TZ_NAME" ] || { echo "unknown KIDS_OS_TIMEZONE '$TZ_NAME'" >&2; exit 1; }
 ln -sfn "../usr/share/zoneinfo/$TZ_NAME" "$BUILDROOT/etc/localtime"
 echo "$TZ_NAME" > "$BUILDROOT/etc/timezone"
+
+# data-partition cap for doubtful media (the partition otherwise grows to the whole medium on first boot)
+if [ -n "${KIDS_OS_DATA_MAX:-}" ]; then printf 'SizeMaxBytes=%s\n' "$KIDS_OS_DATA_MAX" >> "$BUILDROOT/usr/lib/repart.d/20-data.conf"; fi
 
 # runtime knobs read by the session units (EnvironmentFile)
 printf 'KIDS_OS_SCALE=%s\n' "${KIDS_OS_SCALE:-1.5}" > "$BUILDROOT/etc/kids-os/kids-os.env"

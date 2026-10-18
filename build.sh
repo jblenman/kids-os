@@ -11,7 +11,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib/env.sh"
 VM="${KIDS_OS_VM:-kidos-build}"; OUT="$KIDS_OS_OUT"; LOG="$OUT/build.log"
 VM_OUT=/var/tmp/kidos-out; VM_CACHE=/var/tmp/kidos-cache; VM_SECRETS=/tmp/kidos-secrets.env
-KEYS="KIDS_OS_ADMIN_USER KIDS_OS_ADMIN_PASSWORD_HASH KIDS_OS_WIFI_SSID KIDS_OS_WIFI_PSK KIDS_OS_PIN KIDS_OS_HOSTNAME KIDS_OS_TIMEZONE KIDS_OS_SCALE"
+KEYS="KIDS_OS_ADMIN_USER KIDS_OS_ADMIN_PASSWORD_HASH KIDS_OS_WIFI_SSID KIDS_OS_WIFI_PSK KIDS_OS_PIN KIDS_OS_HOSTNAME KIDS_OS_TIMEZONE KIDS_OS_SCALE KIDS_OS_DATA_MAX"
 LOCAL="$HERE/mkosi/mkosi.extra/etc/kids-os/local"
 mkdir -p "$OUT"
 

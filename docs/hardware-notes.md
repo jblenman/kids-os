@@ -24,7 +24,7 @@ Gigabyte **Z68XP-UD3** (BIOS F10, Gigabyte "Hybrid EFI"), Core i5-2500K, 16 GB, 
 
 ## USB sticks (general lessons)
 - A USB 2.0 stick is fine for the first boots and painful after that: Chrome's random writes starve everything else (load > 10, D-state processes, journald hitting its 3-minute watchdog during package installs). Use a USB 3 stick, or install to an SSD.
-- Cheap no-name sticks may report more capacity than they have. The image caps its data partition (`SizeMaxBytes` in `usr/lib/repart.d/20-data.conf`) so a fake-capacity stick cannot silently wrap writes; raise or remove the cap for media you trust (verify with F3 first).
+- Cheap no-name sticks may report more capacity than they have. Build with `KIDS_OS_DATA_MAX=32G` for such a stick so the data partition cannot silently wrap writes; verify the stick with F3 before trusting more of it.
 - When writing on macOS, a stick that drops off the bus mid-write (`dd: Device not configured`) leaves the old content beyond the point reached — the next boot ends in the initrd's emergency shell. Write again (another port helped here) and always verify; `tools/write-usb-macos.sh` reads the written range back and compares hashes.
 - Boot from a USB 2.0 stick takes about two minutes to the desktop on this machine; from an SSD a fraction of that.
 
