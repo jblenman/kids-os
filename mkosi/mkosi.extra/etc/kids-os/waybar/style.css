@@ -1,0 +1,12 @@
+/* kids-os shelf — dark, flat, big targets for a trackpad */
+/* text in Noto Sans only — with the emoji font in the list the digits came out as wide keycap glyphs */
+* { font-family: "Noto Sans", sans-serif; font-size: 26px; min-height: 0; }
+#network, #wireplumber { font-family: "Noto Color Emoji", "Noto Sans Symbols2", sans-serif; font-size: 30px; }
+window#waybar { background: rgba(32, 33, 36, 0.96); color: #e8eaed; }
+#custom-launcher { font-size: 38px; color: #ffffff; padding: 0 26px; margin: 8px 6px; border-radius: 30px; }
+#custom-launcher:hover { background: rgba(255, 255, 255, 0.12); }
+#taskbar button { padding: 0 10px; margin: 6px 2px; border-radius: 10px; border-bottom: 3px solid transparent; }
+#taskbar button.active { border-bottom-color: #8ab4f8; background: rgba(255, 255, 255, 0.08); }
+#taskbar button:hover { background: rgba(255, 255, 255, 0.12); }
+#tray, #network, #wireplumber, #custom-clock { padding: 0 10px; margin: 6px 0; }
+#custom-clock { padding-right: 18px; font-weight: 500; }

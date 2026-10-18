@@ -1,0 +1,5 @@
+# started by labwc for the kid session (sh); idempotent so a compositor restart does not stack shelves
+pkill -x waybar; pkill -x swaybg
+swaybg -m fill -i /usr/share/kids-os/wallpaper.png >/dev/null 2>&1 &
+waybar -c /etc/kids-os/waybar/config.jsonc -s /etc/kids-os/waybar/style.css >/dev/null 2>&1 &
+/usr/lib/kids-os/chrome-kid &

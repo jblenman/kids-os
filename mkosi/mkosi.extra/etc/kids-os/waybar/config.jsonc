@@ -1,0 +1,18 @@
+// kids-os shelf (v1a): launcher · running windows · tray, Wi-Fi, volume, clock
+{
+  "layer": "top",
+  "position": "bottom",
+  "height": 84,
+  "spacing": 6,
+  "exclusive": true,
+  "modules-left": ["custom/launcher"],
+  "modules-center": ["wlr/taskbar"],
+  "modules-right": ["tray", "network", "wireplumber", "custom/clock"],
+  "custom/launcher": { "format": "●", "tooltip": false, "on-click": "/usr/lib/kids-os/launcher-open" },
+  "wlr/taskbar": { "format": "{icon}", "icon-size": 48, "tooltip-format": "{title}", "on-click": "activate", "on-click-middle": "close", "all-outputs": true },
+  "tray": { "icon-size": 28, "spacing": 14 },
+  "network": { "format-wifi": "📶", "format-ethernet": "🖧", "format-disconnected": "⚠", "tooltip-format-wifi": "{essid}  {signalStrength}%", "tooltip-format-disconnected": "no network" },
+  "wireplumber": { "format": "{icon}", "format-muted": "🔇", "format-icons": ["🔈", "🔉", "🔊"], "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle", "scroll-step": 5, "max-volume": 100, "tooltip-format": "{volume}%" },
+  // GNU date gives the ChromeOS-style "Oct 16   6:38" (no zero padding), which the built-in clock's std::format cannot
+  "custom/clock": { "exec": "date '+%b %-d   %-I:%M'", "interval": 30, "tooltip": false }
+}

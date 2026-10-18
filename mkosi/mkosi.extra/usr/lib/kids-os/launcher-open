@@ -1,0 +1,7 @@
+#!/bin/sh
+# Toggle the launcher: a second, minimal Chrome instance showing the launcher page as an app window.
+if pkill -f "user-data-dir=/run/kids-os/launcher"; then exit 0; fi
+mkdir -p /run/kids-os/launcher 2>/dev/null
+exec /usr/bin/google-chrome-stable --ozone-platform=wayland --user-data-dir=/run/kids-os/launcher --no-first-run \
+    --password-store=basic --disable-features=TranslateUI --force-device-scale-factor="${KIDS_OS_SCALE:-1.5}" \
+    --app=http://127.0.0.1:7707/launcher.html >/dev/null 2>&1

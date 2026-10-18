@@ -1,0 +1,11 @@
+[Unit]
+Description=Pick the tty1 session at boot (sign-in screen or kid session)
+After=kids-sessiond.service systemd-user-sessions.service systemd-logind.service
+Wants=kids-sessiond.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/kids-os/session-select
+
+[Install]
+WantedBy=graphical.target

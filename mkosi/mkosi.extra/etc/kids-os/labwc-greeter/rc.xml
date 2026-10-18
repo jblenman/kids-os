@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!-- labwc config for the sign-in screen: one maximized kiosk window, no shortcuts, no menu -->
+<labwc_config>
+  <core><decoration>client</decoration><gap>0</gap></core>
+  <placement><policy>center</policy></placement>
+  <theme><name></name><cornerRadius>0</cornerRadius></theme>
+  <keyboard></keyboard>
+  <mouse></mouse>
+  <windowRules>
+    <windowRule identifier="*" serverDecoration="no"><action name="Maximize"/></windowRule>
+  </windowRules>
+</labwc_config>

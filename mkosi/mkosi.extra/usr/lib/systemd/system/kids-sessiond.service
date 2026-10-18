@@ -1,0 +1,13 @@
+[Unit]
+Description=kids-os session helper (shell pages, PIN, launcher, power) on 127.0.0.1:7707
+After=local-fs.target
+Before=greeter-session.service kid-session.service
+
+[Service]
+EnvironmentFile=-/etc/kids-os/kids-os.env
+ExecStart=/usr/lib/kids-os/kids-sessiond
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

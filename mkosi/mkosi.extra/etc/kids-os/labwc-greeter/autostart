@@ -1,0 +1,2 @@
+# sign-in screen: Chrome in kiosk mode on the local login page
+/usr/bin/google-chrome-stable --ozone-platform=wayland --kiosk --no-first-run --password-store=basic --user-data-dir=/run/kids-os/greeter --force-device-scale-factor="${KIDS_OS_SCALE:-1.5}" http://127.0.0.1:7707/login.html >/dev/null 2>&1 &

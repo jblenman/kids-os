@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Launcher</title>
+<style>
+  html,body { height:100%; margin:0; font-family:"Noto Sans",sans-serif; color:#e8eaed; user-select:none; }
+  body { background:#202124f2; display:flex; flex-direction:column; align-items:center; padding:48px 24px 0; box-sizing:border-box; }
+  .search { width:min(720px,90vw); display:flex; align-items:center; gap:14px; background:#303134; border-radius:32px; padding:14px 24px; font-size:24px; }
+  .search input { flex:1; background:transparent; border:0; outline:0; color:#fff; font:inherit; }
+  .grid { margin-top:48px; display:grid; grid-template-columns:repeat(auto-fit, 140px); gap:28px 24px; justify-content:center; width:min(960px,92vw); }
+  .app { display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; border-radius:16px; padding:10px 4px; }
+  .app:hover { background:#ffffff12; } .app:active { transform:scale(.96); }
+  .icon { width:88px; height:88px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:40px; font-weight:600; color:#fff; box-shadow:0 4px 16px #0005; }
+  .label { font-size:18px; text-align:center; line-height:1.2; }
+  .bottom { margin-top:auto; padding:24px; display:flex; gap:12px; }
+  .bottom button { background:#303134; color:#e8eaed; border:0; border-radius:24px; padding:12px 22px; font:19px "Noto Sans",sans-serif; cursor:pointer; }
+</style></head>
+<body>
+  <div class="search">🔍 <input id="q" placeholder="Search Google or type a web address" autofocus></div>
+  <div class="grid" id="grid"></div>
+  <div class="bottom"><button onclick="api('/api/signout')">Sign out</button><button onclick="api('/api/power',{action:'poweroff'})">⏻ Shut down</button></div>
+<script>
+let cfg = {};
+function api(path, body){ return fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body || {})}); }
+function launch(url){ api("/api/launch", {url}); }
+document.getElementById("q").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return; const q = e.target.value.trim(); if (!q) return;
+  const looksLikeUrl = /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(q) || /^https?:\/\//i.test(q);
+  launch(looksLikeUrl ? (q.startsWith("http") ? q : "https://" + q) : (cfg.search_url || "https://www.google.com/search?q=") + encodeURIComponent(q));
+});
+fetch("/api/config").then(r => r.json()).then(c => {
+  cfg = c; const g = document.getElementById("grid");
+  for (const a of (c.apps || [])) {
+    const d = document.createElement("div"); d.className = "app"; d.onclick = () => launch(a.url);
+    d.innerHTML = `<div class="icon" style="background:${a.color || '#5f6368'}">${a.icon || a.name[0]}</div><div class="label">${a.name}</div>`;
+    g.appendChild(d);
+  }
+});
+</script></body></html>

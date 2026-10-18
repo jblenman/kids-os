@@ -1,0 +1,21 @@
+{
+  "IncognitoModeAvailability": 1,
+  "DeveloperToolsAvailability": 2,
+  "BrowserGuestModeEnabled": false,
+  "BrowserAddPersonEnabled": false,
+  "DnsOverHttpsMode": "off",
+  "ForceGoogleSafeSearch": true,
+  "ForceYouTubeRestrict": 1,
+  "DefaultBrowserSettingEnabled": false,
+  "MetricsReportingEnabled": false,
+  "BackgroundModeEnabled": false,
+  "PasswordManagerEnabled": false,
+  "PromotionsEnabled": false,
+  "AllowFileSelectionDialogs": false,
+  "DownloadRestrictions": 3,
+  "PrintingEnabled": false,
+  "HomepageLocation": "https://www.google.com",
+  "ShowHomeButton": true,
+  "RestoreOnStartup": 4,
+  "RestoreOnStartupURLs": ["https://www.google.com"]
+}

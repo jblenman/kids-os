@@ -1,0 +1,92 @@
+#!/bin/bash
+# kids-os-install — copy the running kids-os onto an internal drive, BIOS-only (GRUB in the MBR, no EFI loader),
+# with a GRUB menu that also offers Windows if a Windows disk is given.
+#
+#   sudo kids-os-install /dev/sdX [--windows-disk /dev/sdY] --yes
+#
+# Layout written to the target (GPT): 1 MiB BIOS-boot, 1 GiB boot (vfat: kernel, initrd, grub), 4 GiB root
+# (a block copy of the running root), kids-data = the rest of the disk (fresh ext4). Everything on the target is
+# destroyed. The running system is left untouched; the stick can stay as the rescue/installer medium.
+set -euo pipefail
+TARGET=""; WINDISK=""; YES=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --windows-disk) WINDISK="$2"; shift 2;;
+        --yes) YES=1; shift;;
+        -*) echo "unknown option $1" >&2; exit 2;;
+        *) TARGET="$1"; shift;;
+    esac
+done
+[ -n "$TARGET" ] && [ -b "$TARGET" ] || { echo "usage: kids-os-install /dev/sdX [--windows-disk /dev/sdY] --yes" >&2; exit 2; }
+[ "$(id -u)" = 0 ] || { echo "run as root" >&2; exit 2; }
+
+ROOT_PART=$(findmnt -n -o SOURCE /)
+ROOT_DISK=/dev/$(lsblk -n -o PKNAME "$ROOT_PART")
+BOOT_SRC=$(findmnt -n -o TARGET -S "$(blkid -L ESP)" 2>/dev/null || true); BOOT_SRC=${BOOT_SRC:-/boot}
+[ "$(readlink -f "$TARGET")" != "$(readlink -f "$ROOT_DISK")" ] || { echo "refusing: $TARGET is the disk this system runs from" >&2; exit 2; }
+if [ -n "$WINDISK" ]; then
+    WIN_UUID=$(lsblk -n -o UUID,FSTYPE,LABEL "$WINDISK" | awk '$2=="ntfs"{print $1; exit}')
+    [ -n "$WIN_UUID" ] || { echo "no NTFS partition found on $WINDISK" >&2; exit 2; }
+fi
+
+echo "Target: $TARGET ($(lsblk -d -n -o SIZE,MODEL "$TARGET" | tr -s ' '))"; lsblk "$TARGET"
+echo "Source root: $ROOT_PART, boot files: $BOOT_SRC"; [ -n "$WINDISK" ] && echo "Windows menu entry: NTFS $WIN_UUID on $WINDISK"
+if [ "$YES" != 1 ]; then read -r -p "Type the target device name to destroy it and install: " a; [ "$a" = "$TARGET" ] || { echo "aborted"; exit 1; }; fi
+
+ROOT_UUID=$(cat /proc/sys/kernel/random/uuid); DATA_UUID=$(cat /proc/sys/kernel/random/uuid); BOOT_UUID=$(cat /proc/sys/kernel/random/uuid)
+ROOT_SECTORS=$(blockdev --getsz "$ROOT_PART")
+umount -q "$TARGET"* 2>/dev/null || true
+wipefs -a -q "$TARGET"
+sfdisk -q --wipe always "$TARGET" <<SF
+label: gpt
+unit: sectors
+first-lba: 2048
+size=2048, type=21686148-6449-6E6F-744E-656564454649, name="bios-boot"
+size=2097152, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="kids-boot", uuid=$BOOT_UUID
+size=$ROOT_SECTORS, type=4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709, name="root-x86-64", uuid=$ROOT_UUID
+type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="kids-data", uuid=$DATA_UUID
+SF
+udevadm settle
+P() { lsblk -n -o PATH "$TARGET" | sed -n "$(( $1 + 1 ))p"; }
+BOOT_P=$(P 2); ROOT_P=$(P 3); DATA_P=$(P 4)
+
+echo "== copying the root ($(( ROOT_SECTORS / 2048 )) MiB)"
+sync   # the source root is the live filesystem; flush what is pending before the block copy
+dd if="$ROOT_PART" of="$ROOT_P" bs=4M status=progress conv=fsync
+echo "== boot partition"; mkfs.vfat -F 32 -n KIDSBOOT "$BOOT_P" >/dev/null   # no -q: dosfstools has none (prints its help, exits 1)
+echo "== data partition"; mkfs.ext4 -q -F -L kids-data "$DATA_P"
+
+M=$(mktemp -d); mkdir -p "$M/boot" "$M/root"
+mount "$BOOT_P" "$M/boot"; mount "$ROOT_P" "$M/root"
+# kernel, initrds and GRUB's own files — but no EFI directory, so this board's Hybrid EFI never takes the EFI path
+rsync -a --exclude EFI --exclude loader "$BOOT_SRC"/ "$M/boot"/
+grub-install --target=i386-pc --boot-directory="$M/boot" --force "$TARGET" >/dev/null
+KVER=$(ls "$M/boot/kids-os" | grep -E '^[0-9]' | sort -V | tail -1)
+CMDLINE=$(sed -n 's/.*root=PARTUUID=[0-9a-fA-F-]* //p' /proc/cmdline | sed 's/ BOOT_IMAGE=[^ ]*//')
+WIN_ENTRY=""
+if [ -n "${WIN_UUID:-}" ]; then
+    # bootmgr expects its own disk to be BIOS drive 0x80; with the kids disk first in the boot order Windows sits on hd1,
+    # so swap the two for it (the os-prober recipe: drivemap -s)
+    WIN_ENTRY=$'menuentry "Windows" {\n    insmod part_msdos\n    insmod ntfs\n    insmod drivemap\n    search --no-floppy --fs-uuid --set=root '"$WIN_UUID"$'\n    drivemap -s (hd0) ${root}\n    chainloader +1\n}\n'
+fi
+cat > "$M/boot/grub/grub.cfg" <<CFG
+set default=0
+set timeout=3
+insmod part_gpt
+insmod fat
+search --no-floppy --fs-uuid --set=root $(blkid -s UUID -o value "$BOOT_P")
+menuentry "Kids" {
+    linux /kids-os/$KVER/vmlinuz root=PARTUUID=$ROOT_UUID $CMDLINE
+    initrd /kids-os/microcode.initrd /kids-os/initrd /kids-os/$KVER/kernel-modules.initrd
+}
+$WIN_ENTRY
+CFG
+# the installed system mounts its own data partition, not the stick's (labels collide while both are present)
+sed -i "s|^LABEL=kids-data |PARTUUID=$DATA_UUID |" "$M/root/etc/fstab"
+# the boot partition is a plain Linux-type partition on purpose (this board's Hybrid EFI jumps at any GPT disk that carries an
+# EFI System Partition; BIOS GRUB only needs the filesystem), so gpt-auto will not mount it — fstab does
+grep -q " /boot " "$M/root/etc/fstab" || echo "PARTUUID=$BOOT_UUID  /boot  vfat  defaults,nofail,umask=0077  0  2" >> "$M/root/etc/fstab"
+# the data partition already fills the disk: no first-boot growth to do
+rm -f "$M/root/usr/lib/repart.d/20-data.conf"
+sync; umount "$M/boot" "$M/root"; rmdir "$M/boot" "$M/root" "$M"
+echo "== done: $TARGET boots kids-os (BIOS/MBR GRUB, root PARTUUID $ROOT_UUID). Set it first in the BIOS boot order; F12 still reaches the stick and the other drives."

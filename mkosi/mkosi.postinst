@@ -1,0 +1,96 @@
+#!/bin/bash
+# Runs after package installation, outside the image, with the image at $BUILDROOT; `mkosi-chroot` runs inside it.
+# Per-family settings arrive two ways (build.sh prepares both from the configuration directory, ~/.config/kids-os by default):
+#   environment (secrets.env, passed by variable name so nothing lands in a command line or the build log)
+#     KIDS_OS_ADMIN_USER           the parent's account (default admin): sudo without password, ssh with keys
+#     KIDS_OS_ADMIN_PASSWORD_HASH  crypt(3) hash for the admin's console login on tty2 (optional; ssh is key-only anyway)
+#     KIDS_OS_WIFI_SSID / KIDS_OS_WIFI_PSK   Wi-Fi to join (optional; without it use Ethernet or `nmtui` on tty2)
+#     KIDS_OS_PIN                  4–8 digit sign-in PIN for the kid session (optional; none = no sign-in screen)
+#     KIDS_OS_HOSTNAME (default kids-desktop) · KIDS_OS_TIMEZONE (default Etc/UTC) · KIDS_OS_SCALE (default 1.5)
+#   files staged into /etc/kids-os/local/ (removed again below)
+#     authorized_keys   the admin's ssh public keys · config.json  the launcher's apps · wallpaper.png
+set -euo pipefail
+ADMIN="${KIDS_OS_ADMIN_USER:-admin}"
+case "$ADMIN" in kid|greeter|root|"") echo "KIDS_OS_ADMIN_USER must not be '$ADMIN'" >&2; exit 1;; esac
+[[ "$ADMIN" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { echo "KIDS_OS_ADMIN_USER '$ADMIN' is not a valid user name" >&2; exit 1; }
+LOCAL="${BUILDROOT:?}/etc/kids-os/local"
+
+# users: the admin (sudo, ssh keys) · kid = the session user (no sudo, no password) · greeter = the sign-in screen's user
+mkosi-chroot useradd --create-home --shell /bin/bash --groups sudo,video,audio,input,render "$ADMIN"
+mkosi-chroot useradd --create-home --shell /bin/bash --groups video,audio,input,render kid
+mkosi-chroot useradd --create-home --shell /usr/sbin/nologin --groups video,audio,input,render greeter
+if [ -n "${KIDS_OS_ADMIN_PASSWORD_HASH:-}" ]; then
+    mkosi-chroot usermod --password "$KIDS_OS_ADMIN_PASSWORD_HASH" "$ADMIN"
+fi
+mkosi-chroot passwd --lock root
+printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$ADMIN" > "$BUILDROOT/etc/sudoers.d/kids-os-admin"
+chmod 440 "$BUILDROOT/etc/sudoers.d/kids-os-admin"
+
+# admin keys live in /etc (home directories are not part of the image contract)
+install -d -m 755 "$BUILDROOT/etc/ssh/authorized_keys.d"
+if [ -s "$LOCAL/authorized_keys" ]; then
+    install -m 644 "$LOCAL/authorized_keys" "$BUILDROOT/etc/ssh/authorized_keys.d/$ADMIN"
+else
+    echo "WARNING: no authorized_keys in the configuration directory — the image will accept no ssh login (console on tty2 only)" >&2
+fi
+
+# sshd: keys only, no root, keys from /etc
+install -d "$BUILDROOT/etc/ssh/sshd_config.d"
+printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin no\nAuthorizedKeysFile /etc/ssh/authorized_keys.d/%%u\n' > "$BUILDROOT/etc/ssh/sshd_config.d/10-kids-os.conf"
+
+# Wi-Fi, baked in when the secrets carry it
+if [ -n "${KIDS_OS_WIFI_SSID:-}" ] && [ -n "${KIDS_OS_WIFI_PSK:-}" ]; then
+    install -d -m 700 "$BUILDROOT/etc/NetworkManager/system-connections"
+    cat > "$BUILDROOT/etc/NetworkManager/system-connections/home.nmconnection" <<NM
+[connection]
+id=home
+type=wifi
+autoconnect=true
+
+[wifi]
+ssid=$KIDS_OS_WIFI_SSID
+mode=infrastructure
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=$KIDS_OS_WIFI_PSK
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+NM
+    chmod 600 "$BUILDROOT/etc/NetworkManager/system-connections/home.nmconnection"
+fi
+
+# identity: hostname and time zone
+if [ -n "${KIDS_OS_HOSTNAME:-}" ]; then echo "$KIDS_OS_HOSTNAME" > "$BUILDROOT/etc/hostname"; fi
+TZ_NAME="${KIDS_OS_TIMEZONE:-Etc/UTC}"
+[ -f "$BUILDROOT/usr/share/zoneinfo/$TZ_NAME" ] || { echo "unknown KIDS_OS_TIMEZONE '$TZ_NAME'" >&2; exit 1; }
+ln -sfn "../usr/share/zoneinfo/$TZ_NAME" "$BUILDROOT/etc/localtime"
+echo "$TZ_NAME" > "$BUILDROOT/etc/timezone"
+
+# runtime knobs read by the session units (EnvironmentFile)
+printf 'KIDS_OS_SCALE=%s\n' "${KIDS_OS_SCALE:-1.5}" > "$BUILDROOT/etc/kids-os/kids-os.env"
+
+# the family's launcher config and wallpaper, when supplied
+if [ -s "$LOCAL/config.json" ]; then install -m 644 "$LOCAL/config.json" "$BUILDROOT/etc/kids-os/config.json"; fi
+if [ -s "$LOCAL/wallpaper.png" ]; then install -m 644 "$LOCAL/wallpaper.png" "$BUILDROOT/usr/share/kids-os/wallpaper.png"; fi
+rm -rf "${LOCAL:?}"
+
+# /data mountpoint for the data partition (grown to the medium on first boot)
+install -d -m 755 "$BUILDROOT/data"
+
+# sign-in PIN, when the secrets carry one (kids-os-set-pin on the box changes it later)
+if [ -n "${KIDS_OS_PIN:-}" ]; then
+    mkosi-chroot /usr/lib/kids-os/kids-os-set-pin "$KIDS_OS_PIN"
+fi
+
+# services
+mkosi-chroot systemctl enable NetworkManager ssh systemd-resolved systemd-timesyncd systemd-repart kids-sessiond kids-os-session getty@tty2
+mkosi-chroot systemctl set-default graphical.target
+# never suspend: on old boards a failed S3 resume is a black screen with dead input (seen on ChromeOS Flex)
+install -d "$BUILDROOT/etc/systemd/sleep.conf.d" "$BUILDROOT/etc/systemd/logind.conf.d"
+printf '[Sleep]\nAllowSuspend=no\nAllowHibernation=no\nAllowHybridSleep=no\nAllowSuspendThenHibernate=no\n' > "$BUILDROOT/etc/systemd/sleep.conf.d/10-kids-os.conf"
+printf '[Login]\nHandlePowerKey=poweroff\nHandleLidSwitch=ignore\nIdleAction=ignore\n' > "$BUILDROOT/etc/systemd/logind.conf.d/10-kids-os.conf"

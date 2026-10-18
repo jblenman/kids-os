@@ -1,0 +1,39 @@
+[Unit]
+Description=Kid desktop session (labwc shell + Google Chrome; cage fallback) on tty1
+After=systemd-user-sessions.service systemd-logind.service data.mount
+Wants=data.mount
+Conflicts=getty@tty1.service greeter-session.service
+Wants=kids-sessiond.service
+After=kids-sessiond.service
+# starts at boot when no PIN is configured; otherwise only after the sign-in screen unlocked it
+ConditionPathExists=|!/etc/kids-os/pin.hash
+ConditionPathExists=|/run/kids-os/unlocked
+After=getty@tty1.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+EnvironmentFile=-/etc/kids-os/kids-os.env
+User=kid
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+Environment=XDG_SESSION_TYPE=wayland
+Environment=XDG_CURRENT_DESKTOP=labwc:wlroots
+# lets the compositor fall back to software rendering where there is no GPU (QEMU tests); real hardware keeps GL
+Environment=WLR_RENDERER_ALLOW_SOFTWARE=1
+ExecStartPre=+/bin/sh -c 'if mountpoint -q /data; then install -d -m 750 -o kid -g kid /data/kid; fi'
+ExecStart=/usr/lib/kids-os/kid-session
+# PAM moves the session's processes into a logind scope, so stopping the unit alone leaves labwc/Chrome running
+ExecStopPost=-/usr/bin/loginctl terminate-user kid
+Restart=always
+RestartSec=5
+
+# started by kids-os-session.service (boot) or kids-sessiond (unlock / sign-out), never enabled directly

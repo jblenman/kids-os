@@ -1,0 +1,8 @@
+#!/bin/sh
+# Start exactly one tty1 session at boot: the sign-in screen when a PIN is configured and nobody has unlocked yet,
+# the kid session otherwise. (Having both units wanted by graphical.target with mutual Conflicts= made systemd drop
+# one of the two jobs from the boot transaction — not always the right one.)
+if [ -f /etc/kids-os/pin.hash ] && [ ! -f /run/kids-os/unlocked ]; then
+    exec systemctl start --no-block greeter-session.service
+fi
+exec systemctl start --no-block kid-session.service

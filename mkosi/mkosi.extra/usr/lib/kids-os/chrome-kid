@@ -1,0 +1,16 @@
+#!/bin/sh
+# Google Chrome for the kid session: profile on /data when that partition is mounted and writable, otherwise in $HOME.
+# KIDS_OS_SCALE (default 1.5) sizes the whole UI for a TV seen from a couch (1080p → a 1280x720 logical desktop).
+set -u
+DATA_DIR=/data/kid/chrome
+if [ -d /data/kid ] && [ -w /data/kid ] && mkdir -p "$DATA_DIR" 2>/dev/null; then
+    ARGS="--user-data-dir=$DATA_DIR"
+else
+    ARGS=""
+fi
+COMMON="--ozone-platform=wayland --no-first-run --password-store=basic --disable-features=TranslateUI --disable-session-crashed-bubble --hide-crash-restore-bubble --disk-cache-size=104857600 --force-device-scale-factor=${KIDS_OS_SCALE:-1.5} $ARGS"
+if [ "${1:-}" = "--open" ]; then
+    # hand a URL to the running browser (Chrome's single-instance handoff); used by the launcher
+    exec /usr/bin/google-chrome-stable $COMMON --new-window "$2"
+fi
+exec systemd-cat -t kid-chrome /usr/bin/google-chrome-stable $COMMON --start-maximized "$@" https://www.google.com

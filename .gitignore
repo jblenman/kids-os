@@ -1,0 +1,12 @@
+# build outputs never live here (DriveFS zeroes large files under ~/Projects) — see README
+mkosi/mkosi.output/
+mkosi/mkosi.cache/
+mkosi/mkosi.builddir/
+mkosi/mkosi.local.conf
+*.raw
+*.img
+*.qcow2
+# per-family files are staged here by build.sh for the duration of a build; nothing personal is ever tracked
+mkosi/mkosi.extra/etc/kids-os/local/
+# secrets live in ~/.config/kids-os/secrets.env, never here
+secrets*

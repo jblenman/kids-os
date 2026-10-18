@@ -1,0 +1,10 @@
+#!/bin/sh
+# Start the kid session: labwc (shelf + Chrome via autostart). If labwc dies within 20 s, fall back to cage + Chrome.
+start=$(date +%s)
+/usr/bin/labwc -C /etc/kids-os/labwc
+rc=$?
+if [ $(( $(date +%s) - start )) -lt 20 ]; then
+    echo "labwc exited with $rc after <20 s — falling back to cage" >&2
+    exec /usr/bin/cage -s -- /usr/lib/kids-os/chrome-kid
+fi
+exit $rc

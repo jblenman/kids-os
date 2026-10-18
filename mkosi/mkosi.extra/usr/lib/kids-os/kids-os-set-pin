@@ -1,0 +1,13 @@
+#!/usr/bin/python3
+"""kids-os-set-pin [PIN]  — set the sign-in PIN (4–8 digits) for the kids session; `--clear` removes it.
+With a PIN set, the box boots to the sign-in screen; without one it goes straight to the session."""
+import getpass, hashlib, pathlib, secrets, sys
+P = pathlib.Path("/etc/kids-os/pin.hash")
+if len(sys.argv) > 1 and sys.argv[1] == "--clear":
+    P.unlink(missing_ok=True); print("PIN cleared"); sys.exit(0)
+pin = sys.argv[1] if len(sys.argv) > 1 else getpass.getpass("New PIN: ")
+if not (pin.isdigit() and 4 <= len(pin) <= 8):
+    sys.exit("PIN must be 4–8 digits")
+salt = secrets.token_bytes(16)
+P.write_text(salt.hex() + "$" + hashlib.pbkdf2_hmac("sha256", pin.encode(), salt, 100_000).hex() + "\n"); P.chmod(0o600)
+print("PIN set")
